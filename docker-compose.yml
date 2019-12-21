@@ -1,0 +1,58 @@
+version: "2.2"
+
+services:
+  microblog:
+    image: "microblog:latest"
+    container_name: microblog
+    environment:
+      MAIL_SERVER: ${MAIL_SERVER}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USE_TLS: ${MAIL_USE_TLS}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      YANDEX_TRANSLATOR_KEY: ${YANDEX_TRANSLATOR_KEY}
+    ports:
+      - 8080
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.4.2
+    container_name: elasticsearch
+    command: elasticsearch -Enetwork.host=0.0.0.0 -Eindices.query.bool.max_clause_count=10240
+    restart: always
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    mem_limit: 4g
+    environment:
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - 9200:9200
+      - 9300:9300
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  telegraf:
+    image: telegraf:1.8
+    restart: always
+    environment:
+      HOST_PROC: /rootfs/proc
+      HOST_SYS: /rootfs/sys
+      HOST_ETC: /rootfs/etc
+      INFLUXDB_URL: ${INFLUXDB_URL}
+      INFLUXDB_TELEGRAF_DATABASE: ${INFLUXDB_TELEGRAF_DATABASE}
+    hostname: localhost
+    volumes:
+      - ./telegraf-local.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/rootfs/sys:ro
+      - /proc:/rootfs/proc:ro
+      - /etc:/rootfs/etc:ro
+
+volumes:
+  esdata:
+    driver: local
