@@ -22,6 +22,7 @@ class Config(object):
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://'
     POSTS_PER_PAGE = 25
     COMMENTS_PER_PAGE = 10
+    FOLLOWERS_PER_PAGE = 10
     INFLUXDB_HOST = os.environ.get('INFLUXDB_HOST') or 'influxdb'
     INFLUXDB_DATABASE = os.environ.get('INFLUXDB_DATABASE') or 'telegraf'
     INFLUXDB_TIMEOUT = 10

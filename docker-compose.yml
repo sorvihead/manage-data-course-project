@@ -107,6 +107,11 @@ services:
       - influxdb
       - postgres
       - redis:redis-server
+    depends_on:
+      - influxdb
+      - elasticsearch
+      - postgres
+      - redis
     volumes:
       - .:/app
 

@@ -448,6 +448,25 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
 
+    @classmethod
+    def before_commit(cls, session):
+        session._changes = {
+            'add': list(session.new),
+            'update': list(session.dirty),
+            'delete': list(session.deleted)
+        }
+
+    @classmethod
+    def after_commit(cls, session):
+        for obj in session._changes['add']:
+            if isinstance(obj, Like):
+                n = Notification(name='Comment')
+                n.user = obj.user
+                session.add(n)
+                session.add(n.user)
+                session.commit()
+        session._changes = None
+
     def __repr__(self):
         return f'<Comment {self.body}, author {self.author}, post {self.post}>'
 
@@ -456,3 +475,28 @@ class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    @classmethod
+    def before_commit(cls, session):
+        session._changes = {
+            'add': list(session.new),
+            'update': list(session.dirty),
+            'delete': list(session.deleted)
+        }
+
+    @classmethod
+    def after_commit(cls, session):
+        for obj in session._changes['add']:
+            if isinstance(obj, Like):
+                n = Notification(name='Like')
+                n.user = obj.user
+                session.add(n)
+                session.add(n.user)
+                session.commit()
+        session._changes = None
+
+
+db.event.listen(db.session, 'before_commit', Like.before_commit)
+db.event.listen(db.session, 'after_commit', Like.after_commit)
+db.event.listen(db.session, 'before_commit', Comment.before_commit)
+db.event.listen(db.session, 'after_commit', Comment.after_commit)
