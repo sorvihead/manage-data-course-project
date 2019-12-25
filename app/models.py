@@ -192,12 +192,13 @@ class User(UserMixin, PaginatedAPIMixin, db.Model):
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
+        if not Role.query.all():
+            Role.insert_roles()
         if self.role is None:
             if self.email in current_app.config['ADMINS']:
                 self.role = Role.query.filter_by(name='Administrator').first()
             if self.role is None:
                 self.role = Role.query.filter_by(default=True).first()
-        self.follow(self)
 
     def __repr__(self):
         return '<User {}>'.format(self.username)

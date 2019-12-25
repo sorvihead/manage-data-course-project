@@ -18,8 +18,10 @@ class Config(object):
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     ADMINS = ['novoid86@yandex.ru', 'shaman0211@gmail.com']
     LANGUAGES = ['en', 'es']
-    MS_TRANSLATOR_KEY = os.environ.get('MS_TRANSLATOR_KEY')
-    ELASTICSEARCH_URL = os.environ.get('ELASTICSEARCH_URL')
+    ES_HOST = os.environ.get('ES_HOST') or 'elasticsearch'
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://'
     POSTS_PER_PAGE = 25
     COMMENTS_PER_PAGE = 10
+    INFLUXDB_HOST = os.environ.get('INFLUXDB_HOST') or 'influxdb'
+    INFLUXDB_DATABASE = os.environ.get('INFLUXDB_DATABASE') or 'telegraf'
+    INFLUXDB_TIMEOUT = 10

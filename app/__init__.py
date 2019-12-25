@@ -1,6 +1,10 @@
 import logging
+import time
+from queue import Queue
 from logging.handlers import SMTPHandler, RotatingFileHandler
 import os
+from threading import Thread
+
 from flask import Flask, request, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -12,6 +16,8 @@ from flask_babel import Babel, lazy_gettext as _l
 from elasticsearch import Elasticsearch
 from redis import Redis
 import rq
+
+from app.infrastructure.push_metrics_adapter import InfluxPushMetricsAdapter
 from config import Config
 
 db = SQLAlchemy()
@@ -25,6 +31,47 @@ moment = Moment()
 babel = Babel()
 
 
+def worker(queue, client):
+    while True:
+        data = queue.get()
+        try:
+            client.push_metrics(data)
+        finally:
+            queue.task_done()
+
+
+def start_listening(queue, client):
+    t = Thread(target=worker, args=(queue, client, ))
+    t.daemon = True
+    t.start()
+
+
+def before_request():
+    request.start_time = time.time()
+
+
+def after_request(client):
+    def inner_with_metrics(response):
+        response_time_data = {
+            "ts": int(request.start_time),
+            "metrics": {"elapsed_time": time.time() - request.start_time},
+            "endpoint": request.path,
+            "measurement": "http_response_time",
+        }
+        response_status_code_data = {
+            "ts": int(request.start_time),
+            "metrics": {"status_code": response.status_code},
+            "endpoint": request.path,
+            "measurement": "http_response_status",
+        }
+        queue.put_nowait((response_time_data, response_status_code_data))
+        return response
+
+    queue = Queue(maxsize=-1)
+    start_listening(queue, client)
+    return inner_with_metrics
+
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -36,8 +83,8 @@ def create_app(config_class=Config):
     bootstrap.init_app(app)
     moment.init_app(app)
     babel.init_app(app)
-    app.elasticsearch = Elasticsearch([app.config['ELASTICSEARCH_URL']]) \
-        if app.config['ELASTICSEARCH_URL'] else None
+    app.elasticsearch = Elasticsearch([{'host': app.config['ES_HOST'], 'port': 9200}]) \
+        if app.config['ES_HOST'] else None
     app.redis = Redis.from_url(app.config['REDIS_URL'])
     app.task_queue = rq.Queue('microblog-tasks', connection=app.redis)
 
@@ -85,8 +132,11 @@ def create_app(config_class=Config):
             file_handler.setLevel(logging.INFO)
             app.logger.addHandler(file_handler)
 
+        influx_client = InfluxPushMetricsAdapter()
         app.logger.setLevel(logging.INFO)
         app.logger.info('Microblog startup')
+        app.after_request(after_request(influx_client))
+        app.before_request(before_request)
 
     return app
 

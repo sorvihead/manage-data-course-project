@@ -9,7 +9,7 @@ from app import db
 from app.decorators import admin_required, permission_required
 from app.main import bp
 from app.main.forms import EditProfileForm, PostForm, SearchForm, MessageForm, EditProfileAdminForm, CommentForm
-from app.models import User, Post, Message, Notification, Permission, Role, Comment
+from app.models import User, Post, Message, Notification, Permission, Role, Comment, Like
 from app.translate import translate
 
 
@@ -36,7 +36,7 @@ def index():
     if current_user.is_authenticated:
         show_followed = bool(request.cookies.get('show_followed', ''))
     if show_followed:
-        query = current_user.followed_posts
+        query = current_user.followed_posts()
     else:
         query = Post.query
     pagination = query.order_by(Post.timestamp.desc()).paginate(
@@ -241,6 +241,21 @@ def edit_profile_admin(id):
     form.location.data = selected_user.location
     form.about_me.data = selected_user.about_me
     return render_template('edit_profile.html', form=form, user=selected_user)
+
+
+@bp.route('/like/<int:id>')
+@login_required
+@permission_required(Permission.WRITE)
+def like(id):
+    post = Post.query.get_or_404(id)
+    if current_user in [like_.user for like_ in post.likes]:
+        return redirect(url_for('main.index'))
+    like = Like()
+    like.post = post
+    like.user = current_user._get_current_object()
+    db.session.add(like)
+    db.session.commit()
+    return redirect(url_for('main.index'))
 
 
 @bp.route('/search')
