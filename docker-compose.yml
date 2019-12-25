@@ -72,8 +72,25 @@ services:
     links:
       - influxdb
 
+  redis:
+    image: redis:3-alpine
+
+  worker:
+    image: microblog
+    command: worker -u redis://redis-server:6379/0 microblog-tasks
+    depends_on:
+      - redis
+    links:
+      - redis:redis-server
+      - postgres
+    entrypoint:
+      - venv/bin/rq
+    env_file:
+      - ./.env
+
   microblog:
     build: .
+    image: microblog
     container_name: microblog
     environment:
       MAIL_SERVER: ${MAIL_SERVER}
@@ -82,12 +99,14 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
     ports:
       - 8000:8080
     links:
       - elasticsearch
       - influxdb
       - postgres
+      - redis:redis-server
     volumes:
       - .:/app
 
