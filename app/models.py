@@ -100,18 +100,33 @@ class SearchableMixin(object):
             'update': list(session.dirty),
             'delete': list(session.deleted)
         }
+        print(session._changes)
 
     @classmethod
     def after_commit(cls, session):
         for obj in session._changes['add']:
             if isinstance(obj, SearchableMixin):
-                add_to_index(obj.__tablename__, obj)
+                # add_to_index(obj.__tablename__, obj)
+                pass
         for obj in session._changes['update']:
             if isinstance(obj, SearchableMixin):
-                add_to_index(obj.__tablename__, obj)
+                # add_to_index(obj.__tablename__, obj)
+                if isinstance(obj, Like):
+                    n = Notification(name='Like')
+                    n.user = obj.user
+                    session.add(n)
+                    session.add(n.user)
+                    session.add(obj)
+                if isinstance(obj, Comment):
+                    n = Notification(name='Comment')
+                    n.user = obj.user
+                    session.add(n)
+                    session.add(n.user)
+                pass
         for obj in session._changes['delete']:
             if isinstance(obj, SearchableMixin):
-                remove_from_index(obj.__tablename__, obj)
+                # remove_from_index(obj.__tablename__, obj)
+                pass
         session._changes = None
 
     @classmethod
@@ -119,9 +134,6 @@ class SearchableMixin(object):
         for obj in cls.query:
             add_to_index(cls.__tablename__, obj)
 
-
-db.event.listen(db.session, 'before_commit', SearchableMixin.before_commit)
-db.event.listen(db.session, 'after_commit', SearchableMixin.after_commit)
 
 
 class PaginatedAPIMixin(object):
@@ -439,7 +451,7 @@ class Task(db.Model):
         return job.meta.get('progress', 0) if job is not None else 100
 
 
-class Comment(db.Model):
+class Comment(db.Model, SearchableMixin):
     id = db.Column(db.Integer, primary_key=True)
     body = db.Column(db.String(280), index=True)
     body_html = db.Column(db.Text)
@@ -448,55 +460,16 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
 
-    @classmethod
-    def before_commit(cls, session):
-        session._changes = {
-            'add': list(session.new),
-            'update': list(session.dirty),
-            'delete': list(session.deleted)
-        }
-
-    @classmethod
-    def after_commit(cls, session):
-        for obj in session._changes['add']:
-            if isinstance(obj, Like):
-                n = Notification(name='Comment')
-                n.user = obj.user
-                session.add(n)
-                session.add(n.user)
-                session.commit()
-        session._changes = None
 
     def __repr__(self):
         return f'<Comment {self.body}, author {self.author}, post {self.post}>'
 
 
-class Like(db.Model):
+class Like(db.Model, SearchableMixin):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
-    @classmethod
-    def before_commit(cls, session):
-        session._changes = {
-            'add': list(session.new),
-            'update': list(session.dirty),
-            'delete': list(session.deleted)
-        }
 
-    @classmethod
-    def after_commit(cls, session):
-        for obj in session._changes['add']:
-            if isinstance(obj, Like):
-                n = Notification(name='Like')
-                n.user = obj.user
-                session.add(n)
-                session.add(n.user)
-                session.commit()
-        session._changes = None
-
-
-db.event.listen(db.session, 'before_commit', Like.before_commit)
-db.event.listen(db.session, 'after_commit', Like.after_commit)
-db.event.listen(db.session, 'before_commit', Comment.before_commit)
-db.event.listen(db.session, 'after_commit', Comment.after_commit)
+db.event.listen(db.session, 'before_commit', SearchableMixin.before_commit)
+db.event.listen(db.session, 'after_commit', SearchableMixin.after_commit)
